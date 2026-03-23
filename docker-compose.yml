@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  insightcloud:
+    build: .
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    volumes:
+      - ./uploads:/app/uploads
+      - ./insightcloud.db:/app/insightcloud.db
+    environment:
+      - STORAGE_MODE=${STORAGE_MODE:-local}
+      - AI_MODE=${AI_MODE:-gemini}
+    restart: unless-stopped
