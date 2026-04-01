@@ -7,14 +7,13 @@ Triple AI Mode: Gemini (free) + Groq (free) + Bedrock (AWS production).
 
 import streamlit as st
 import pandas as pd
-import warnings
-warnings.filterwarnings("ignore", message=".*Arrow.*")
+
 from database import init_db, SessionLocal
 from auth import signup_user, login_user
 from upload import ensure_upload_dir, validate_csv, save_file, list_files, load_file_as_df
 from processing import get_summary
 from genai import ask_question, build_context
-from Report import generate_insight_pdf
+from report import generate_insight_pdf
 from config import APP_NAME, APP_VERSION, is_aws_mode, is_bedrock_mode, is_groq_mode, STORAGE_MODE, AI_MODE
 
 # ─── Page Configuration ────────────────────────────────────
@@ -890,39 +889,67 @@ def render_ask_ai_page():
             st.error("Please enter a question.")
         else:
             with st.spinner(f"🧠 Analyzing your data with {get_ai_label()}..."):
-                answer = ask_question(final_question, df)
+                answer, response_time = ask_question(final_question, df)
 
-            st.markdown("---")
-            st.markdown("### 💡 AI Insight")
-            st.markdown(answer)
+            # Store the latest answer in session state so it persists across reruns
+            st.session_state["last_question"] = final_question
+            st.session_state["last_answer"] = answer
+            st.session_state["last_response_time"] = response_time
 
-            # Download AI report as PDF
-            user = st.session_state.get("user", {})
-            pdf_bytes = generate_insight_pdf(
-                filename=filename,
-                rows=df.shape[0],
-                columns=df.shape[1],
-                question=final_question,
-                answer=answer,
-                user_name=user.get("full_name", "User"),
-                user_role=user.get("role", "Analyst"),
-            )
-            st.download_button(
-                label="📄 Download Report as PDF",
-                data=pdf_bytes,
-                file_name=f"InsightCloud_Report_{filename.replace('.csv', '')}.pdf",
-                mime="application/pdf",
-                use_container_width=True,
-            )
-
-            # Transparency: show dataset context sent to AI
-            with st.expander("🔍 Dataset context sent to AI"):
-                st.code(build_context(df), language="text")
+            # Track performance metrics
+            if "query_count" not in st.session_state:
+                st.session_state["query_count"] = 0
+            if "total_response_time" not in st.session_state:
+                st.session_state["total_response_time"] = 0.0
+            st.session_state["query_count"] += 1
+            st.session_state["total_response_time"] += response_time
 
             # Store in chat history
             if "chat_history" not in st.session_state:
                 st.session_state["chat_history"] = []
             st.session_state["chat_history"].append({"q": final_question, "a": answer})
+
+    # Display the last answer (persists across reruns)
+    if st.session_state.get("last_answer"):
+        st.markdown("---")
+        st.markdown("### 💡 AI Insight")
+        st.markdown(st.session_state["last_answer"])
+
+        # Performance metrics bar
+        resp_time = st.session_state.get("last_response_time", 0)
+        query_count = st.session_state.get("query_count", 0)
+        avg_time = round(st.session_state.get("total_response_time", 0) / max(query_count, 1), 2)
+
+        perf_col1, perf_col2, perf_col3 = st.columns(3)
+        with perf_col1:
+            st.metric("Response Time", f"{resp_time}s")
+        with perf_col2:
+            st.metric("Queries This Session", query_count)
+        with perf_col3:
+            st.metric("Avg Response Time", f"{avg_time}s")
+
+        # Download AI report as PDF
+        user = st.session_state.get("user", {})
+        pdf_bytes = generate_insight_pdf(
+            filename=filename,
+            rows=df.shape[0],
+            columns=df.shape[1],
+            question=st.session_state.get("last_question", ""),
+            answer=st.session_state["last_answer"],
+            user_name=user.get("full_name", "User"),
+            user_role=user.get("role", "Analyst"),
+        )
+        st.download_button(
+            label="📄 Download Report as PDF",
+            data=pdf_bytes,
+            file_name=f"InsightCloud_Report_{filename.replace('.csv', '')}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+
+        # Transparency: show dataset context sent to AI
+        with st.expander("🔍 Dataset context sent to AI"):
+            st.code(build_context(df), language="text")
 
     # Show chat history (previous questions)
     chat_history = st.session_state.get("chat_history", [])

@@ -341,25 +341,32 @@ def ask_with_bedrock(question: str, df: pd.DataFrame) -> str:
         return f"⚠️ Bedrock error: {error_msg}"
 
 
-def ask_question(question: str, df: pd.DataFrame) -> str:
+def ask_question(question: str, df: pd.DataFrame) -> tuple:
     """
     MAIN FUNCTION called by app.py.
     Automatically routes to Gemini, Groq, or Bedrock based on AI_MODE in .env.
+    Returns both the answer and the response time.
 
     - AI_MODE=gemini  → Google Gemini 2.5 Flash (FREE, for local testing)
     - AI_MODE=groq    → Groq LLaMA 3.3 70B (FREE, super fast, for local testing)
-    - AI_MODE=bedrock → AWS Bedrock Claude 3 Haiku (for AWS production)
+    - AI_MODE=bedrock → AWS Bedrock Mistral 8B (for AWS production)
 
     Args:
         question: The user's natural language question.
         df: pandas DataFrame of the uploaded dataset.
 
     Returns:
-        AI-generated insight string.
+        Tuple of (answer: str, response_time: float in seconds).
     """
+    import time
+    start = time.time()
+
     if is_bedrock_mode():
-        return ask_with_bedrock(question, df)
+        answer = ask_with_bedrock(question, df)
     elif is_groq_mode():
-        return ask_with_groq(question, df)
+        answer = ask_with_groq(question, df)
     else:
-        return ask_with_gemini(question, df)
+        answer = ask_with_gemini(question, df)
+
+    elapsed = round(time.time() - start, 2)
+    return answer, elapsed
