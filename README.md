@@ -2,25 +2,25 @@
 
 **Cloud-native GenAI CSV Analytics Platform on AWS**
 
-Upload CSV files and get AI-driven, explainable insights using natural language — powered by AWS Bedrock (Claude 3 Haiku) for production and Groq LLaMA 3.3 70B (free) for local development.
+Upload CSV files and get AI-driven, explainable insights using natural language — powered by AWS Bedrock (Mistral 8B) for production and Groq LLaMA 3.3 70B (free) for local development.
 
 ---
 
 ## Tech Stack
 
-| Component       | Technology                     |
-| --------------- | ------------------------------ |
-| UI              | Streamlit                      |
-| Data Processing | Pandas                         |
-| AI (Production) | AWS Bedrock (Claude 3 Haiku)   |
-| AI (Local/Free) | Groq — LLaMA 3.3 70B Versatile |
-| Storage         | AWS S3 (+ local mode)          |
-| Compute         | AWS EC2                        |
-| Auth            | JWT + bcrypt                   |
-| Database        | SQLite + SQLAlchemy            |
-| Container       | Docker + docker-compose        |
-| CI/CD           | GitHub Actions                 |
-| Theme           | Warm Gold (#B88E23)            |
+| Component       | Technology                              |
+| --------------- | --------------------------------------- |
+| UI              | Streamlit                               |
+| Data Processing | Pandas                                  |
+| AI (Production) | AWS Bedrock — Mistral Ministral 3 8B    |
+| AI (Local/Free) | Groq — LLaMA 3.3 70B Versatile         |
+| Storage         | AWS S3 (+ local dual mode)              |
+| Compute         | AWS EC2                                 |
+| Auth            | JWT + bcrypt                            |
+| Database        | SQLite + SQLAlchemy                     |
+| Container       | Docker + docker-compose                 |
+| CI/CD           | GitHub Actions                          |
+| Theme           | Warm Gold (#B88E23)                     |
 
 ---
 
@@ -28,8 +28,8 @@ Upload CSV files and get AI-driven, explainable insights using natural language 
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-repo/insightcloud.git
-cd insightcloud
+git clone https://github.com/BurraRohan/Cloud-native-GenAI-CSV-Analytics-Platform.git
+cd Cloud-native-GenAI-CSV-Analytics-Platform
 
 # 2. Set up virtual environment
 python -m venv venv
@@ -90,45 +90,76 @@ The system prompt includes a **few-shot example** to teach the AI the desired an
 
 ---
 
+## Role-Based Access Control
+
+Three enforced roles with real feature restrictions:
+
+| Feature              | Admin | Analyst | Viewer |
+| -------------------- | ----- | ------- | ------ |
+| Dashboard            | ✅    | ✅      | ✅     |
+| Upload CSV           | ✅    | ✅      | ❌     |
+| Ask AI               | ✅    | ✅      | ✅     |
+| Load Datasets        | ✅    | ✅      | ✅     |
+| User Management      | ✅    | ❌      | ❌     |
+| Download PDF Report  | ✅    | ✅      | ✅     |
+
+---
+
 ## AWS Deployment Guide
 
-### Step 1: Enable Claude Haiku in Bedrock
-
-1. Go to **AWS Bedrock Console** (us-east-1 region)
-2. Click **"Model access"** → **"Manage model access"**
-3. Check **"Claude 3 Haiku"** by Anthropic
-4. Click **"Save changes"** and wait for **"Access granted"**
-
-### Step 2: Create S3 Bucket
-
+### Step 1: Create S3 Bucket
 1. Go to **AWS S3 Console**
 2. Create bucket: `insightcloud-uploads`
 3. Region: `us-east-1`
 4. Block all public access: **YES**
 5. Enable encryption: **AES-256**
 
-### Step 3: Create IAM Role for EC2
-
+### Step 2: Create IAM Role for EC2
 1. Go to **AWS IAM Console**
 2. Create Role → AWS Service → EC2
 3. Create custom policy using [`deploy/iam_policy.json`](deploy/iam_policy.json)
 4. Name: `InsightCloud-EC2-Role`
 
-> The IAM policy follows **least-privilege** — only allows S3 bucket access and Bedrock Claude Haiku invocation.
-
-### Step 4: Launch EC2 & Deploy
-
-1. AMI: **Ubuntu 24.04 LTS** | Type: **t2.micro** (free tier)
+### Step 3: Launch EC2 & Deploy
+1. AMI: **Ubuntu 24.04 LTS** | Type: **t3.micro** (free tier)
 2. Security group: allow **port 8501** + **port 22**
 3. IAM profile: **InsightCloud-EC2-Role**
 4. SSH in and run:
 
 ```bash
-bash deploy/ec2_setup.sh
-docker compose up --build -d
+sudo apt update && sudo apt install -y docker.io docker-compose git
+git clone https://github.com/BurraRohan/Cloud-native-GenAI-CSV-Analytics-Platform.git
+cd Cloud-native-GenAI-CSV-Analytics-Platform
+nano .env  # Add your environment variables
+sudo docker-compose up --build -d
 ```
 
 5. Access: `http://your-ec2-public-ip:8501`
+
+---
+
+## Testing
+
+87 test cases across 5 modules — all passing:
+
+```
+tests/test_auth.py        — 17 tests (password hashing, JWT, signup, login)
+tests/test_upload.py      — 16 tests (CSV validation, file save, list, load)
+tests/test_processing.py  — 20 tests (summary stats, groupby, column analysis)
+tests/test_genai.py       — 19 tests (context building, prompts, messages)
+tests/test_config.py      — 15 tests (mode toggles, env vars, settings)
+```
+
+Run tests: `pytest`
+
+---
+
+## Monitoring
+
+AWS CloudWatch dashboard (`InsightCloud-Monitoring`) tracking:
+- **S3 Storage** — BucketSizeBytes, NumberOfObjects
+- **AI Performance** — Invocations, InvocationLatency
+- **Token Usage** — InputTokenCount, OutputTokenCount, EstimatedTPMQuotaUsage
 
 ---
 
@@ -140,15 +171,18 @@ insightcloud/
 ├── auth.py               → JWT authentication (signup, login, token management)
 ├── upload.py             → CSV upload & validation — dual mode (local + S3)
 ├── processing.py         → Pandas data analysis & summary statistics
-├── genai.py              → AI integration — triple mode (Groq + Gemini + Bedrock)
+├── genai.py              → AI integration — dual mode (Groq + Bedrock Mistral)
 ├── database.py           → SQLAlchemy + SQLite setup
 ├── models.py             → User database model
 ├── config.py             → Centralized configuration & mode toggles
 ├── s3_utils.py           → AWS S3 helper functions
+├── report.py             → PDF report generator
 ├── requirements.txt      → Python dependencies
+├── pytest.ini            → Test configuration
 ├── Dockerfile            → Container definition
 ├── docker-compose.yml    → Container orchestration
 ├── .env.example          → Environment variables template
+├── tests/                → 87 test cases
 ├── .streamlit/
 │   └── config.toml       → Streamlit theme configuration
 ├── deploy/
@@ -163,33 +197,31 @@ insightcloud/
 
 ## Key Features
 
-- 🔐 **JWT Authentication** — Secure signup/login with bcrypt password hashing and role-based access
-- 📁 **Dual-Mode Storage** — Seamless local ↔ S3 switching via `STORAGE_MODE` in `.env`
-- 🧠 **Triple AI Mode** — Groq (free, fast), Gemini (free), Bedrock (AWS production)
-- 📊 **Pandas Processing** — Auto summary statistics, column analysis, null detection, data preview
-- 💬 **Context-Injected AI** — Real dataset info (columns, types, stats, sample rows) sent with every query
-- 📝 **Few-Shot Prompting** — AI taught to give specific numbers, percentages, and recommendations
+- 🔐 **JWT Authentication** — Secure signup/login with bcrypt password hashing
+- 👥 **Role-Based Access** — Admin, Analyst, Viewer with enforced restrictions
+- 📁 **Dual-Mode Storage** — Seamless local ↔ S3 switching via `STORAGE_MODE`
+- 🧠 **Dual AI Mode** — Groq (free, fast) for local, Bedrock Mistral for AWS production
+- 📊 **Pandas Processing** — Auto summary statistics, column analysis, null detection
+- 💬 **Context-Injected AI** — Real dataset info sent with every query for accurate answers
+- 📄 **PDF Reports** — Download AI insights as professional PDF documents
+- 📈 **Performance Metrics** — Response time tracking, query count, average latency
 - 🎨 **Polished UI** — Warm gold theme (#B88E23), Playfair Display + DM Sans typography
 - 🐳 **Docker Ready** — One-command deployment with docker-compose
 - ⚙️ **CI/CD Pipeline** — GitHub Actions for automated testing and Docker builds
-- 🔒 **Security** — IAM least-privilege policies, environment variables for secrets, input validation, HTTPS
+- 🔒 **Security** — IAM least-privilege, env variables, input validation, S3 encryption
+- 🧪 **87 Test Cases** — Comprehensive pytest coverage across all modules
+- 📊 **CloudWatch Monitoring** — S3 storage, Bedrock latency, token usage dashboards
 
 ---
 
 ## Security Practices
 
 - JWT tokens with bcrypt password hashing
+- Role-based access control (Admin, Analyst, Viewer)
 - IAM roles for EC2 → S3 and Bedrock access (least privilege)
 - API keys stored in environment variables — never hardcoded
 - CSV input validation (file type, size, readability)
+- AES-256 server-side encryption for S3 uploads
 - HTTPS for all communication in production
 
 ---
-
-## Course
-
-**Cloud Product & Platform Engineering (21IPE315P)** — Review 2
-
-**Team:** Jan Saida (RA2311003010093), B. Rohan (RA2311003010113)
-
-**Faculty:** Mrs. Agalya A
