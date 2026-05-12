@@ -6,8 +6,6 @@ InsightCloud is a cloud-native SaaS platform where users upload structured datas
  
 Built with Python, Streamlit, Pandas, and AWS (S3, Bedrock, EC2), with a free local development mode using Groq.
  
-> **Live Demo:** Deploy on AWS EC2 or run locally in under 2 minutes (see [Quick Start](#quick-start))
- 
 ---
  
 ## How It Works
